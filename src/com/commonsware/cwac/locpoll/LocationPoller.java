@@ -27,19 +27,9 @@ import android.location.Location;
 public class LocationPoller extends BroadcastReceiver {
 	
 	public static final String EXTRA_ERROR = "EXTRA_ERROR";
-	public static final String EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION = "EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION";
 	public static final String EXTRA_LOCATION = "EXTRA_LOCATION";
 	public static final String EXTRA_LAST_KNOWN_LOCATION = "EXTRA_LASTKNOWN_LOCATION";
-	public static final String EXTRA_PROVIDER = "EXTRA_PROVIDER";
-	public static final String EXTRA_TIMEOUT = "EXTRA_TIMEOUT";
 	
-	private static final long DEFAULT_TIMEOUT = 2 * 60 * 1000;
-	/**
-	 * @deprecated
-	 * 'EXTRA_INTENT' not descriptive enough. Extra intent to do what?
-	 */
-	public static final String EXTRA_INTENT = EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION;
-
 	/**
 	 * @deprecated
 	 * 'EXTRA_LASTKNOWN' not descriptive enough. Last unknown what?
@@ -53,14 +43,6 @@ public class LocationPoller extends BroadcastReceiver {
 	
 	public static Location getLastKnownLocation(Intent intent) {
 		return (Location)intent.getExtras().get(EXTRA_LAST_KNOWN_LOCATION);
-	}
-	
-	public static long getTimeout(Intent intent) {
-		return intent.getExtras().getLong(EXTRA_TIMEOUT, DEFAULT_TIMEOUT);
-	}
-	
-	public static void setTimeout(Intent intent, long timeout) {
-		intent.putExtra(EXTRA_TIMEOUT, timeout);
 	}
 	
 	public static Location getBestAvailableLocation(Intent intent) {

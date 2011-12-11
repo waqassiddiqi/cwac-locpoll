@@ -25,7 +25,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
-import android.util.Log;
 
 /**
  * Service providing the guts of the location polling
@@ -37,7 +36,6 @@ import android.util.Log;
  * the LocationPoller class.
  */
 public class LocationPollerService extends Service {
-  private static final String LOG_TAG = "LocationPoller";
   private static final String LOCK_NAME_STATIC = "com.commonsware.cwac.locpoll.LocationPoller";
   private static volatile PowerManager.WakeLock mLockStatic;
   private LocationManager mLocationManager;
@@ -65,27 +63,52 @@ public class LocationPollerService extends Service {
    * location. Acquires the WakeLock, then starts the
    * service using the supplied Intent (setting the
    * component so routing always goes to the service).
-   */
-  public static void requestLocation(Context context, Intent intent) {
-    String provider = intent.getStringExtra(LocationPoller.EXTRA_PROVIDER);
-    Intent toBroadcast=
-        (Intent)intent.getExtras().get(LocationPoller.EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION);
+	 */
+	public static void requestLocation(Context context, Intent intent)
+			throws InvalidParameterException {
 
-    if (provider==null) {
-      Log.e(LOG_TAG, "Invalid Intent -- has no provider");
-    }
-    else if (toBroadcast==null) {
-      Log.e(LOG_TAG,
-            "Invalid Intent -- has no Intent to broadcast");
-    }
-    else {
-      getLock(context).acquire();
+		assertValidParameters(intent);
+		getLock(context).acquire();
 
-      intent.setClass(context, LocationPollerService.class);
+		intent.setClass(context, LocationPollerService.class);
 
-      context.startService(intent);
-    }
-  }
+		context.startService(intent);
+	}
+
+	public static void assertValidParameters(Intent intent)
+			throws InvalidParameterException {
+		LocationPollerParameter parameters = getParametersFromIntent(intent);
+
+		if (parameters.getIntentToBroadcastOnCompletion() == null) {
+			throw new InvalidParameterException(
+					"no intentToBroadcastOnCompletion set");
+		}
+
+		if (parameters.getProviders() == null
+				|| parameters.getProviders().isEmpty()) {
+			throw new InvalidParameterException(
+					"at least one provider must be set");
+		}
+	}
+
+	public static LocationPollerParameter getParametersFromIntent(Intent intent)
+			throws InvalidParameterException {
+
+		Bundle bundle = intent.getExtras();
+		if (bundle == null) {
+			throw new InvalidParameterException("intent does not have bundle");
+		}
+
+		LocationPollerParameter parameter = (LocationPollerParameter) bundle
+				.get(LocationPollerParameter.KEY);
+
+		if (parameter == null) {
+			throw new InvalidParameterException(
+					"intent does not have LocationPollerParameter object");
+		}
+		return parameter;
+
+	}
 
   /**
    * Obtain the LocationManager on startup
@@ -116,31 +139,44 @@ public class LocationPollerService extends Service {
    */
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
-    String provider = intent.getStringExtra(LocationPoller.EXTRA_PROVIDER);
-    Intent toBroadcast = (Intent)intent.getExtras().get(LocationPoller.EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION);
+		LocationPollerParameter parameters = getParametersFromIntent(intent);
 
-    toBroadcast.setPackage(getPackageName());
+		Intent toBroadcast = parameters.getIntentToBroadcastOnCompletion();
 
-    long timeout = LocationPoller.getTimeout(intent);
-    PollerThread pollerThread = new PollerThread(getLock(this), mLocationManager, provider, toBroadcast, timeout);
-    pollerThread.start();
+		toBroadcast.setPackage(getPackageName());
+		PollerThread pollerThread = new PollerThread(getLock(this),
+				mLocationManager, parameters);
+		pollerThread.start();
 
-    return(START_REDELIVER_INTENT);
-  }
+		return (START_REDELIVER_INTENT);
+	}
 
-  /**
-   * A WakefulThread subclass that knows how to look up the
-   * current location, plus handle the timeout scenario.
-   */
-  private class PollerThread extends WakefulThread {
-    private LocationManager mLocationManager;
-    private String mProvider;
-    private Intent mIntentTemplate;
-    private Runnable mOnTimeout;
-    private Handler mHandler = new Handler();
-    private long mTimeout;
+	/**
+	 * A WakefulThread subclass that knows how to look up the current location,
+	 * plus handle the timeout scenario.
+	 */
+	private class PollerThread extends WakefulThread {
+		private LocationManager mLocationManager;
 
-    private LocationListener listener = new LocationListener() {
+		private Handler mHandler = new Handler();
+		private LocationPollerParameter mLocationPollerParameter;
+		private int mCurrentLocationProviderIndex;
+
+		private Runnable mOnTimeout = new Runnable() {
+
+			public void run() {
+				mLocationManager.removeUpdates(mListener);
+				if (isTriedAllProviders()) {
+					broadCastFailureMessage();
+					quit();
+				} else {
+					mCurrentLocationProviderIndex++;
+					tryNextProvider();
+				}
+			}
+		};
+
+    private LocationListener mListener = new LocationListener() {
       /**
        * If we get a fix, get rid of the timeout condition,
        * then attach the location as an extra
@@ -149,7 +185,7 @@ public class LocationPollerService extends Service {
        */
       public void onLocationChanged(Location location) {
         mHandler.removeCallbacks(mOnTimeout);
-        Intent toBroadcast=new Intent(mIntentTemplate);
+        Intent toBroadcast=new Intent(mLocationPollerParameter.getIntentToBroadcastOnCompletion());
 
         toBroadcast.putExtra(LocationPoller.EXTRA_LOCATION, location);
         sendBroadcast(toBroadcast);
@@ -184,17 +220,13 @@ public class LocationPollerService extends Service {
      *          Intent to be broadcast when location found
      *          or timeout occurs
      */
-    PollerThread(PowerManager.WakeLock lock,
-    			 LocationManager locationManager,
-                 String provider,
-                 Intent intentTemplate,
-                 long timeout) {
-      super(lock, "LocationPoller-PollerThread");
+		PollerThread(PowerManager.WakeLock lock,
+				LocationManager locationManager,
+				LocationPollerParameter locationPollerParameter) {
+			super(lock, "LocationPoller-PollerThread");
 
-      this.mLocationManager = locationManager;
-      this.mProvider = provider;
-      this.mIntentTemplate = intentTemplate;
-      this.mTimeout = timeout;
+			this.mLocationManager = locationManager;
+			this.mLocationPollerParameter = locationPollerParameter;
     }
 
     /**
@@ -206,21 +238,38 @@ public class LocationPollerService extends Service {
      */
     @Override
     protected void onPreExecute() {
-      mOnTimeout=new Runnable() {
-        public void run() {
-          Intent toBroadcast=new Intent(mIntentTemplate);
+			tryNextProvider();
+		}
 
-          toBroadcast.putExtra(LocationPoller.EXTRA_ERROR, "Timeout!");
-          toBroadcast.putExtra(LocationPoller.EXTRA_LAST_KNOWN_LOCATION,
-                               mLocationManager.getLastKnownLocation(mProvider));
-          sendBroadcast(toBroadcast);
-          quit();
-        }
-      };
+		private void tryNextProvider() {
+			mHandler.postDelayed(mOnTimeout,
+					mLocationPollerParameter.getTimeout());
+			mLocationManager.requestLocationUpdates(getCurrentProvider(), 0, 0,
+					mListener);
+		}
 
-      mHandler.postDelayed(mOnTimeout, mTimeout);
-      mLocationManager.requestLocationUpdates(mProvider, 0, 0, listener);
-    }
+		private void broadCastFailureMessage() {
+			Intent toBroadcast = new Intent(
+					mLocationPollerParameter.getIntentToBroadcastOnCompletion());
+
+			toBroadcast.putExtra(LocationPoller.EXTRA_ERROR, "Timeout!");
+			Location location = mLocationManager
+					.getLastKnownLocation(getCurrentProvider());
+			toBroadcast.putExtra(LocationPoller.EXTRA_LAST_KNOWN_LOCATION,
+					location);
+			sendBroadcast(toBroadcast);
+		}
+
+		private String getCurrentProvider() {
+			String currentProvider = mLocationPollerParameter.getProviders()
+					.get(mCurrentLocationProviderIndex);
+			return currentProvider;
+		}
+
+		private boolean isTriedAllProviders() {
+			return mCurrentLocationProviderIndex == mLocationPollerParameter
+					.getProviders().size() - 1;
+		}
 
     /**
      * Called when the Handler loop ends. Removes the
@@ -228,7 +277,7 @@ public class LocationPollerService extends Service {
      */
     @Override
     protected void onPostExecute() {
-      mLocationManager.removeUpdates(listener);
+      mLocationManager.removeUpdates(mListener);
 
       super.onPostExecute();
     }
