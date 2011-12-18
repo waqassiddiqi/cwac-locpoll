@@ -15,6 +15,8 @@
 
 package com.commonsware.cwac.locpoll;
 
+import java.io.IOException;
+
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -98,18 +100,19 @@ public class LocationPollerService extends Service {
 	public static LocationPollerParameter getParametersFromIntent(Intent intent)
 			throws InvalidParameterException {
 
-		Bundle bundle = intent.getExtras();
-		if (bundle == null) {
-			throw new InvalidParameterException("intent does not have bundle");
+				
+		byte[] parameterAsByteArray = intent.getByteArrayExtra(LocationPollerParameter.KEY);
+		if (parameterAsByteArray == null) {
+			throw new InvalidParameterException("intent does not have LocationPollerParameter");
+		}
+		
+		LocationPollerParameter parameter = new LocationPollerParameter();
+		try {
+			SerializeHelper.internalize(parameter, parameterAsByteArray);
+		} catch (IOException e) {
+			throw new InvalidParameterException("intent does not have a valid LocationPollerParameter", e);
 		}
 
-		LocationPollerParameter parameter = (LocationPollerParameter) bundle
-				.getSerializable(LocationPollerParameter.KEY);
-
-		if (parameter == null) {
-			throw new InvalidParameterException(
-					"intent does not have LocationPollerParameter object");
-		}
 		return parameter;
 
 	}
