@@ -26,9 +26,16 @@ import android.location.Location;
  */
 public class LocationPoller extends BroadcastReceiver {
 	
-	public static final String EXTRA_ERROR = "EXTRA_ERROR";
-	public static final String EXTRA_LOCATION = "EXTRA_LOCATION";
-	public static final String EXTRA_LAST_KNOWN_LOCATION = "EXTRA_LASTKNOWN_LOCATION";
+	public static final String EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION = "com.commonsware.cwac.locpoll.EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION";
+	public static final String EXTRA_ERROR = "com.commonsware.cwac.locpoll.EXTRA_ERROR";
+	public static final String EXTRA_LOCATION = "com.commonsware.cwac.locpoll.EXTRA_LOCATION";
+	public static final String EXTRA_LAST_KNOWN_LOCATION = "com.commonsware.cwac.locpoll.EXTRA_LASTKNOWN_LOCATION";
+	
+	/**
+	 * @deprecated
+	 * 'EXTRA_INTENT' not descriptive enough. Extra intent to do what?
+	 */
+	public static final String EXTRA_INTENT = EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION;
 	
 	/**
 	 * @deprecated

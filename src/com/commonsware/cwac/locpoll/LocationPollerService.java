@@ -37,8 +37,8 @@ import android.os.PowerManager;
  */
 public class LocationPollerService extends Service {
   private static final String LOCK_NAME_STATIC = "com.commonsware.cwac.locpoll.LocationPoller";
-  private static volatile PowerManager.WakeLock mLockStatic;
-  private LocationManager mLocationManager;
+  private static volatile PowerManager.WakeLock lockStatic;
+  private LocationManager locationManager;
   
 
   /**
@@ -47,15 +47,15 @@ public class LocationPollerService extends Service {
    * not the screen.
    */
 	synchronized private static PowerManager.WakeLock getLock(Context context) {
-		if (mLockStatic == null) {
+		if (lockStatic == null) {
 			PowerManager mgr = (PowerManager) context.getApplicationContext()
 					.getSystemService(Context.POWER_SERVICE);
 
-			mLockStatic = mgr.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+			lockStatic = mgr.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
 					LOCK_NAME_STATIC);
-			mLockStatic.setReferenceCounted(true);
+			lockStatic.setReferenceCounted(true);
 		}
-		return (mLockStatic);
+		return (lockStatic);
 	}
 
   /**
@@ -79,7 +79,7 @@ public class LocationPollerService extends Service {
 			throws InvalidParameterException {
 		LocationPollerParameter parameters = getParametersFromIntent(intent);
 
-		if (parameters.getIntentToBroadcastOnCompletion() == null) {
+		if (getIntentToBroadcastOnCompletion(intent) == null) {
 			throw new InvalidParameterException(
 					"no intentToBroadcastOnCompletion set");
 		}
@@ -91,6 +91,10 @@ public class LocationPollerService extends Service {
 		}
 	}
 
+    private static Intent getIntentToBroadcastOnCompletion(Intent intent) {
+    	return (Intent)intent.getExtras().get(LocationPoller.EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION);
+    }
+    
 	public static LocationPollerParameter getParametersFromIntent(Intent intent)
 			throws InvalidParameterException {
 
@@ -100,7 +104,7 @@ public class LocationPollerService extends Service {
 		}
 
 		LocationPollerParameter parameter = (LocationPollerParameter) bundle
-				.get(LocationPollerParameter.KEY);
+				.getSerializable(LocationPollerParameter.KEY);
 
 		if (parameter == null) {
 			throw new InvalidParameterException(
@@ -115,7 +119,7 @@ public class LocationPollerService extends Service {
    */
   @Override
   public void onCreate() {
-    mLocationManager=(LocationManager)getSystemService(LOCATION_SERVICE);
+    locationManager=(LocationManager)getSystemService(LOCATION_SERVICE);
   }
 
   /**
@@ -141,11 +145,11 @@ public class LocationPollerService extends Service {
   public int onStartCommand(Intent intent, int flags, int startId) {
 		LocationPollerParameter parameters = getParametersFromIntent(intent);
 
-		Intent toBroadcast = parameters.getIntentToBroadcastOnCompletion();
+		Intent toBroadcast = getIntentToBroadcastOnCompletion(intent);
 
 		toBroadcast.setPackage(getPackageName());
 		PollerThread pollerThread = new PollerThread(getLock(this),
-				mLocationManager, parameters);
+				locationManager, parameters, toBroadcast);
 		pollerThread.start();
 
 		return (START_REDELIVER_INTENT);
@@ -156,21 +160,22 @@ public class LocationPollerService extends Service {
 	 * plus handle the timeout scenario.
 	 */
 	private class PollerThread extends WakefulThread {
-		private LocationManager mLocationManager;
+		private LocationManager locationManager;
 
-		private Handler mHandler = new Handler();
-		private LocationPollerParameter mLocationPollerParameter;
-		private int mCurrentLocationProviderIndex;
-
-		private Runnable mOnTimeout = new Runnable() {
+		private Handler handler = new Handler();
+		private LocationPollerParameter locationPollerParameter;
+		private int currentLocationProviderIndex;
+		private Intent intentTemplate;
+		
+		private Runnable onTimeout = new Runnable() {
 
 			public void run() {
-				mLocationManager.removeUpdates(mListener);
+				locationManager.removeUpdates(mListener);
 				if (isTriedAllProviders()) {
 					broadCastFailureMessage();
 					quit();
 				} else {
-					mCurrentLocationProviderIndex++;
+					currentLocationProviderIndex++;
 					tryNextProvider();
 				}
 			}
@@ -184,8 +189,8 @@ public class LocationPollerService extends Service {
        * exit the polling loop so the thread terminates.
        */
       public void onLocationChanged(Location location) {
-        mHandler.removeCallbacks(mOnTimeout);
-        Intent toBroadcast=new Intent(mLocationPollerParameter.getIntentToBroadcastOnCompletion());
+        handler.removeCallbacks(onTimeout);
+        Intent toBroadcast = new Intent(intentTemplate);
 
         toBroadcast.putExtra(LocationPoller.EXTRA_LOCATION, location);
         sendBroadcast(toBroadcast);
@@ -222,11 +227,13 @@ public class LocationPollerService extends Service {
      */
 		PollerThread(PowerManager.WakeLock lock,
 				LocationManager locationManager,
-				LocationPollerParameter locationPollerParameter) {
+				LocationPollerParameter locationPollerParameter,
+				Intent intentTemplate) {
 			super(lock, "LocationPoller-PollerThread");
 
-			this.mLocationManager = locationManager;
-			this.mLocationPollerParameter = locationPollerParameter;
+			this.locationManager = locationManager;
+			this.locationPollerParameter = locationPollerParameter;
+			this.intentTemplate = intentTemplate;
     }
 
     /**
@@ -242,18 +249,17 @@ public class LocationPollerService extends Service {
 		}
 
 		private void tryNextProvider() {
-			mHandler.postDelayed(mOnTimeout,
-					mLocationPollerParameter.getTimeout());
-			mLocationManager.requestLocationUpdates(getCurrentProvider(), 0, 0,
+			handler.postDelayed(onTimeout,
+					locationPollerParameter.getTimeout());
+			locationManager.requestLocationUpdates(getCurrentProvider(), 0, 0,
 					mListener);
 		}
 
 		private void broadCastFailureMessage() {
-			Intent toBroadcast = new Intent(
-					mLocationPollerParameter.getIntentToBroadcastOnCompletion());
+			Intent toBroadcast = new Intent(intentTemplate);
 
 			toBroadcast.putExtra(LocationPoller.EXTRA_ERROR, "Timeout!");
-			Location location = mLocationManager
+			Location location = locationManager
 					.getLastKnownLocation(getCurrentProvider());
 			toBroadcast.putExtra(LocationPoller.EXTRA_LAST_KNOWN_LOCATION,
 					location);
@@ -261,13 +267,13 @@ public class LocationPollerService extends Service {
 		}
 
 		private String getCurrentProvider() {
-			String currentProvider = mLocationPollerParameter.getProviders()
-					.get(mCurrentLocationProviderIndex);
+			String currentProvider = locationPollerParameter.getProviders()
+					.get(currentLocationProviderIndex);
 			return currentProvider;
 		}
 
 		private boolean isTriedAllProviders() {
-			return mCurrentLocationProviderIndex == mLocationPollerParameter
+			return currentLocationProviderIndex == locationPollerParameter
 					.getProviders().size() - 1;
 		}
 
@@ -277,7 +283,7 @@ public class LocationPollerService extends Service {
      */
     @Override
     protected void onPostExecute() {
-      mLocationManager.removeUpdates(mListener);
+      locationManager.removeUpdates(mListener);
 
       super.onPostExecute();
     }
