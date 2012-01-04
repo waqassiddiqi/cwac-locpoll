@@ -17,7 +17,6 @@ package com.commonsware.cwac.locpoll;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.location.Location;
 
 /**
  * BroadcastReceiver to be launched by AlarmManager. Simply
@@ -26,48 +25,35 @@ import android.location.Location;
  */
 public class LocationPoller extends BroadcastReceiver {
 	
-	public static final String EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION = "com.commonsware.cwac.locpoll.EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION";
-	public static final String EXTRA_ERROR = "com.commonsware.cwac.locpoll.EXTRA_ERROR";
-	public static final String EXTRA_LOCATION = "com.commonsware.cwac.locpoll.EXTRA_LOCATION";
-	public static final String EXTRA_LAST_KNOWN_LOCATION = "com.commonsware.cwac.locpoll.EXTRA_LASTKNOWN_LOCATION";
+	/**
+	 * @deprecated
+	 */
+	public static final String EXTRA_ERROR = LocationPollerResult.ERROR_KEY;
 	
 	/**
 	 * @deprecated
-	 * 'EXTRA_INTENT' not descriptive enough. Extra intent to do what?
 	 */
-	public static final String EXTRA_INTENT = EXTRA_INTENT_TO_BROADCAST_ON_COMPLETION;
+	public static final String EXTRA_INTENT = LocationPollerParameter.INTENT_TO_BROADCAST_ON_COMPLETION_KEY;
 	
 	/**
 	 * @deprecated
-	 * 'EXTRA_LASTKNOWN' not descriptive enough. Last unknown what?
 	 */
-	public static final String EXTRA_LASTKNOWN = EXTRA_LAST_KNOWN_LOCATION;
-	
-	
-	public static Location getLocation(Intent intent) {
-		return (Location)intent.getExtras().get(EXTRA_LOCATION);
-	}
-	
-	public static Location getLastKnownLocation(Intent intent) {
-		return (Location)intent.getExtras().get(EXTRA_LAST_KNOWN_LOCATION);
-	}
-	
-	public static Location getBestAvailableLocation(Intent intent) {
-		Location location = getLocation(intent);
-		if (location == null) {
-			location = getLastKnownLocation(intent);
-		}
-		return location;
-	}
-	
-	public static String getError(Intent intent) {
-		return intent.getStringExtra(LocationPoller.EXTRA_ERROR);
-	}
+	public static final String EXTRA_PROVIDER = LocationPollerParameter.PROVIDER_KEY;
 	
 	/**
-	 * Standard entry point for a BroadcastReceiver. Delegates the event to
-	 * LocationPollerService for processing.
+	 * @deprecated
 	 */
+	public static final String EXTRA_LOCATION = LocationPollerResult.LOCATION_KEY;
+
+	/**
+	 * @deprecated
+	 */
+	public static final String EXTRA_LASTKNOWN = LocationPollerResult.LASTKNOWN_LOCATION_KEY;
+
+	/**
+		* Standard entry point for a BroadcastReceiver. Delegates
+		* the event to LocationPollerService for processing.
+    */
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		LocationPollerService.requestLocation(context, intent);

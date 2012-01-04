@@ -18,61 +18,76 @@
 
 package com.commonsware.cwac.locpoll;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.util.Vector;
+import android.content.Intent;
+import android.os.Bundle;
 
-public class LocationPollerParameter implements SimpleSerializable {
+public class LocationPollerParameter {
 
-	public static String KEY = "com.commonsware.cwac.locpoll.LocationPollerParameter";
+	static final String KEY = "com.commonsware.cwac.locpoll.";
+	static final String INTENT_TO_BROADCAST_ON_COMPLETION_KEY = KEY + "EXTRA_INTENT";
+	static final String PROVIDER_KEY = KEY + "EXTRA_PROVIDER";
+	static final String PROVIDERS_KEY = KEY + "EXTRA_PROVIDERS";
+	static final String TIMEOUT_KEY = KEY + "EXTRA_TIMEOUT";
 	
-	private long timeout;
-	private Vector<String> providers;
+	private static final int DEFAULT_TIMEOUT = 120000; // two minutes
 	
-	public LocationPollerParameter() {
-		this.providers = new Vector<String>();
+	private Bundle bundle;
+	
+	public LocationPollerParameter(Bundle bundle) {
+		this.bundle = bundle;
 	}
 	
-	public int describeContents() {
-		return 0;
-	}
-
 	public long getTimeout() {
-		return timeout;
+		return bundle.getLong(TIMEOUT_KEY, DEFAULT_TIMEOUT);
 	}
 
 	public void setTimeout(long timeout) {
-		this.timeout = timeout;
+		bundle.putLong(TIMEOUT_KEY, timeout);
 	}
 
-	public Vector<String> getProviders() {
+	public String[] getProviders() {
+		String[] providers = bundle.getStringArray(PROVIDERS_KEY);
+		if (providers == null) {
+			String provider = bundle.getString(PROVIDER_KEY);
+			if (provider != null) {
+				providers = new String[] { provider };
+			}
+		}
 		return providers;
 	}
 
-	public void setProviders(Vector<String> providers) {
-		this.providers = providers;
+	public void setProviders(String[] providers) {
+		bundle.putStringArray(PROVIDERS_KEY, providers);
 	}
-
+	
 	public void addProvider(String provider) {
-		this.providers.add(provider);
-	}
-	
-	public void writeToStream(DataOutputStream dataOutputStream) throws IOException {
-		dataOutputStream.writeLong(timeout);
-		dataOutputStream.writeInt(providers.size());
-		for (String provider : providers) {
-			dataOutputStream.writeUTF(provider);
+		String[] existingProviders = getProviders();
+		if (existingProviders == null) {
+			setProviders(new String[] { provider});
+		} else {
+			int providerArrayLength = getProviderArrayLength();
+			String[] newProviders = new String[providerArrayLength + 1];
+			System.arraycopy(existingProviders, 0, newProviders, 0, providerArrayLength);
+			newProviders[providerArrayLength] = provider;
+			setProviders(newProviders);
 		}
 	}
 	
-	public void readFromStream(DataInputStream dataInputStream) throws IOException {
-		timeout = dataInputStream.readLong();
-		int count = dataInputStream.readInt();
-		providers.removeAllElements();
-		for (int i = 0; i < count; i++) {
-			providers.add(dataInputStream.readUTF());
+	public int getProviderArrayLength() {
+		String[] providers = getProviders();
+		if (providers == null) {
+			return 0;
+		} else {
+			return providers.length;
 		}
 	}
+	
+    public Intent getIntentToBroadcastOnCompletion() {
+    	return (Intent) bundle.get(INTENT_TO_BROADCAST_ON_COMPLETION_KEY);
+    }
+    
+    public void setIntentToBroadcastOnCompletion(Intent intentToBroadcastOnCompletion) {
+    	bundle.putParcelable(INTENT_TO_BROADCAST_ON_COMPLETION_KEY, intentToBroadcastOnCompletion);
+    }
 
 }
