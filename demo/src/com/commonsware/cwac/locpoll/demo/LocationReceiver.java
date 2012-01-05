@@ -26,7 +26,7 @@ import android.location.Location;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import com.commonsware.cwac.locpoll.LocationPoller;
+import com.commonsware.cwac.locpoll.LocationPollerResult;
 
 public class LocationReceiver extends BroadcastReceiver {
   @Override
@@ -44,14 +44,17 @@ public class LocationReceiver extends BroadcastReceiver {
       out.write(" : ");
       
       Bundle b=intent.getExtras();
-      Location loc=(Location)b.get(LocationPoller.EXTRA_LOCATION);
+      
+      LocationPollerResult locationResult = new LocationPollerResult(b);
+      
+      Location loc=locationResult.getLocation();
       String msg;
 
       if (loc==null) {
-        loc=(Location)b.get(LocationPoller.EXTRA_LASTKNOWN);
+        loc=locationResult.getLastKnownLocation();
 
         if (loc==null) {
-          msg=intent.getStringExtra(LocationPoller.EXTRA_ERROR);
+          msg=locationResult.getError();
         }
         else {
           msg="TIMEOUT, lastKnown="+loc.toString();

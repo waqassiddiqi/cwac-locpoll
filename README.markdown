@@ -41,12 +41,13 @@ battery, particularly if you are using GPS.
 
 The `PendingIntent` you use for the alarm should be a getBroadcast()
 `PendingIntent`, wrapping an `Intent` destined for
-`com.commonsware.cwac.locpoll.LocationPoller`. That `Intent` should
-have one extra, keyed by `LocationPoller.EXTRA_INTENT`, that
-represents an `Intent` to be "broadcast" when a location is
-found. It should have another extra, keyed by
-`LocationPoller.EXTRA_PROVIDER`, with the name of the location
-provider you wish to use.
+`com.commonsware.cwac.locpoll.LocationPoller`. The `Intent` should
+have a `Bundle` managed by a `com.commonsware.cwac.locpoll.LocationPollerParameter`
+attached to it that contains:
+
+* One or more location providers that will be attempted to be used in order of which they are defined
+* An `Intent` to be "broadcast" when a location is found or a all the location providers have timed out
+* A timeout how long to wait for the provider to respond (optional - defaults to 2 minutes)
 
 For example, this sets up such an alarm:
 
@@ -54,10 +55,14 @@ For example, this sets up such an alarm:
 		
 		Intent i=new Intent(this, LocationPoller.class);
 		
-		i.putExtra(LocationPoller.EXTRA_INTENT,
-							 new Intent(this, LocationReceiver.class));
-		i.putExtra(LocationPoller.EXTRA_PROVIDER,
-							 LocationManager.NETWORK_PROVIDER);
+		Bundle bundle = new Bundle();
+		LocationPollerParameter parameter = new LocationPollerParameter(bundle);
+		parameter.setIntentToBroadcastOnCompletion(new Intent(this, LocationReceiver.class));
+		// try GPS and fall back to NETWORK_PROVIDER
+		parameter.setProviders(new String[] {LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER});
+		parameter.setTimeout(60000);
+		i.putExtras(bundle);
+		
 		
 		pi=PendingIntent.getBroadcast(this, 0, i, 0);
 		mgr.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
@@ -66,30 +71,40 @@ For example, this sets up such an alarm:
 											pi);
 
 Finally, you need a `BroadcastReceiver` set up to respond to the
-`Intent` you supplied via the `LocationPoller.EXTRA_INTENT`
-extra. The `Intent` received by the receiver in `onReceive()`
-will have either a `LocationPoller.EXTRA_LOCATION` extra
-(containing a `Location`) or a `LocationPoller.EXTRA_ERROR`
-extra (containing a `String` with an error message). For example:
+`Intent` you supplied via the `com.commonsware.cwac.locpoll.LocationPollerParameter`
+extra. The `Intent` received by the receiver in `onReceive()` contains an extra
+that should be decoded using a `com.commonsware.cwac.locpoll.LocationPollerResult`.
+For example:
 
-			Location loc=(Location)intent.getExtras().get(LocationPoller.EXTRA_LOCATION);
-			String msg;
-			
-			if (loc==null) {
-				msg=intent.getStringExtra(LocationPoller.EXTRA_ERROR);
-			}
-			else {
-				msg=loc.toString();
-			}
-			
-			if (msg==null) {
-				msg="Invalid broadcast received!";
-			}
+      Bundle b=intent.getExtras();
+      
+      LocationPollerResult locationResult = new LocationPollerResult(b);
+      
+      Location loc=locationResult.getLocation();
+      String msg;
 
-In the case where you get an error message via `EXTRA_ERROR`, there
-will also be an extra named `EXTRA_LASTKNOWN`, containing the results
-of `getLastKnownLocation()` for your selected provider. This may be
-`null` &mdash; if not, it will be a `Location` object.
+      if (loc==null) {
+        loc=locationResult.getLastKnownLocation();
+
+        if (loc==null) {
+          msg=locationResult.getError();
+        }
+        else {
+          msg="TIMEOUT, lastKnown="+loc.toString();
+        }
+      }
+      else {
+        msg=loc.toString();
+      }
+
+      if (msg==null) {
+        msg="Invalid broadcast received!";
+      }
+
+
+In the case where you get an error message via `getError()`, `getLastKnownLocation()` 
+will contain the results of `getLastKnownLocation()` for your selected provider. This 
+may be `null` &mdash; if not, it will be a `Location` object.
 
 Dependencies
 ------------
@@ -97,7 +112,7 @@ This project has no dependencies.
 
 Version
 -------
-This is version 0.2 of this module, meaning it is less new than before.
+This is version 0.3 of this module.
 
 Demo
 ----
@@ -128,5 +143,11 @@ Do not ask for help via Twitter.
 
 Release Notes
 -------------
+
+v0.3.0: added configurable timeout and location provider fallback mechanism
+
 v0.2.0: added `EXTRA_LASTKNOWN` support
+
 v0.1.0: initial release
+
+

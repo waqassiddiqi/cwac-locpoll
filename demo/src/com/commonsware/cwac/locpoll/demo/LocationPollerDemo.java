@@ -24,6 +24,7 @@ import android.os.SystemClock;
 import android.view.View;
 import android.widget.Toast;
 import com.commonsware.cwac.locpoll.LocationPoller;
+import com.commonsware.cwac.locpoll.LocationPollerParameter;
 
 public class LocationPollerDemo extends Activity {
 	private static final int PERIOD=1800000; 	// 30 minutes
@@ -39,10 +40,14 @@ public class LocationPollerDemo extends Activity {
 		
 		Intent i=new Intent(this, LocationPoller.class);
 		
-		i.putExtra(LocationPoller.EXTRA_INTENT,
-							 new Intent(this, LocationReceiver.class));
-		i.putExtra(LocationPoller.EXTRA_PROVIDER,
-							 LocationManager.GPS_PROVIDER);
+		Bundle bundle = new Bundle();
+		LocationPollerParameter parameter = new LocationPollerParameter(bundle);
+		parameter.setIntentToBroadcastOnCompletion(new Intent(this, LocationReceiver.class));
+		// try GPS and fall back to NETWORK_PROVIDER
+		parameter.setProviders(new String[] {LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER});
+		parameter.setTimeout(60000);
+		i.putExtras(bundle);
+		
 		
 		pi=PendingIntent.getBroadcast(this, 0, i, 0);
 		mgr.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
