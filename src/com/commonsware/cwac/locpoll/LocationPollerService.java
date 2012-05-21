@@ -36,12 +36,12 @@ import android.os.PowerManager;
  * the LocationPoller class.
  */
 public class LocationPollerService extends Service {
-  private static final String LOCK_NAME_STATIC = "com.commonsware.cwac.locpoll.LocationPoller";
-  private static volatile PowerManager.WakeLock lockStatic;
-  private LocationManager locationManager;
+	private static final String LOCK_NAME_STATIC = "com.commonsware.cwac.locpoll.LocationPoller";
+	private static volatile PowerManager.WakeLock lockStatic;
+	private LocationManager locationManager;
   
 
-  /**
+	/**
    * Lazy-initializes the WakeLock when we first use it. We
    * use a partial WakeLock since we only need the CPU on,
    * not the screen.
@@ -170,7 +170,7 @@ public class LocationPollerService extends Service {
         Intent toBroadcast = createIntentToBroadcastOnCompletion();
         		
         toBroadcast.putExtra(LocationPollerResult.LOCATION_KEY, location);
-        sendBroadcast(toBroadcast);
+        sendOrderedBroadcast(toBroadcast, null);
         quit();
       }
 
@@ -234,7 +234,7 @@ public class LocationPollerService extends Service {
 			toBroadcast.putExtra(LocationPollerResult.ERROR_KEY, "Timeout!");
 			Location location = locationManager.getLastKnownLocation(getCurrentProvider());
 			toBroadcast.putExtra(LocationPollerResult.LASTKNOWN_LOCATION_KEY, location);
-			sendBroadcast(toBroadcast);
+			sendOrderedBroadcast(toBroadcast, null);
 		}
 
 		private String getCurrentProvider() {
@@ -249,7 +249,7 @@ public class LocationPollerService extends Service {
 		
 		private Intent createIntentToBroadcastOnCompletion() {
 	        Intent toBroadcast = new Intent(locationPollerParameter.getIntentToBroadcastOnCompletion());
-	        toBroadcast.setPackage(getPackageName());
+	        //toBroadcast.setPackage(getPackageName());
 	        return toBroadcast;
 		}
 
