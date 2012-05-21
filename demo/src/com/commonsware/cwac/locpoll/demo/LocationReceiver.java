@@ -71,6 +71,9 @@ public class LocationReceiver extends BroadcastReceiver {
       out.write(msg);
       out.write("\n");
       out.close();
+      
+      Log.d("LocationReceiver", msg);
+      
     }
     catch (IOException e) {
       Log.e(getClass().getName(), "Exception appending to log file", e);

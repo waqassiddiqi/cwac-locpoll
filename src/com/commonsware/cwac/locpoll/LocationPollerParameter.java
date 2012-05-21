@@ -23,11 +23,11 @@ import android.os.Bundle;
 
 public class LocationPollerParameter {
 
-	static final String KEY = "com.commonsware.cwac.locpoll.";
-	static final String INTENT_TO_BROADCAST_ON_COMPLETION_KEY = KEY + "EXTRA_INTENT";
-	static final String PROVIDER_KEY = KEY + "EXTRA_PROVIDER";
-	static final String PROVIDERS_KEY = KEY + "EXTRA_PROVIDERS";
-	static final String TIMEOUT_KEY = KEY + "EXTRA_TIMEOUT";
+	public static final String KEY = "com.commonsware.cwac.locpoll.";
+	public static final String INTENT_TO_BROADCAST_ON_COMPLETION_KEY = KEY + "EXTRA_INTENT";
+	public static final String PROVIDER_KEY = KEY + "EXTRA_PROVIDER";
+	public static final String PROVIDERS_KEY = KEY + "EXTRA_PROVIDERS";
+	public static final String TIMEOUT_KEY = KEY + "EXTRA_TIMEOUT";
 	
 	private static final int DEFAULT_TIMEOUT = 120000; // two minutes
 	
@@ -83,7 +83,7 @@ public class LocationPollerParameter {
 	}
 	
     public Intent getIntentToBroadcastOnCompletion() {
-    	return (Intent) bundle.get(INTENT_TO_BROADCAST_ON_COMPLETION_KEY);
+    	return new Intent(LocationPollerParameter.INTENT_TO_BROADCAST_ON_COMPLETION_KEY);
     }
     
     public void setIntentToBroadcastOnCompletion(Intent intentToBroadcastOnCompletion) {
