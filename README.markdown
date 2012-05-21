@@ -143,6 +143,7 @@ Do not ask for help via Twitter.
 
 Release Notes
 -------------
+v0.4.0: added ordered broadcast support
 
 v0.3.0: added configurable timeout and location provider fallback mechanism
 
